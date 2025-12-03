@@ -1,0 +1,8 @@
+diabetes-api-final-project/
+├─ _quarto.yml
+├─ eda.qmd
+├─ modeling.qmd
+├─ api.R
+├─ dockerfile
+├─ diabetes_binary_health_indicators_BRFSS2015.csv
+└─ docs/           # created when you render site

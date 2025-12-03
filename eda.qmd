@@ -1,0 +1,68 @@
+---
+title: "EDA: Diabetes Health Indicators (BRFSS 2015)"
+author: "Jacob A. Fericy"
+format: html
+---
+
+```{r}
+
+library(tidyverse)
+
+#denote theme for plots later
+theme_set(theme_minimal())
+
+#path to data in root folder
+diab_raw <- read_csv(
+  "diabetes_binary_health_indicators_BRFSS2015.csv",
+  show_col_types = FALSE
+)
+
+#clean the data
+diab <- diab_raw |>
+  mutate(
+    Diabetes_binary = factor(
+      Diabetes_binary,
+      levels = c(0, 1),
+      labels = c("No Diabetes", "Diabetes")
+    )
+  )
+
+#store binary vars
+binary_vars <- c(
+  "HighBP", "HighChol", "CholCheck", "Smoker", "Stroke",
+  "HeartDiseaseorAttack", "PhysActivity", "Fruits", "Veggies",
+  "HvyAlcoholConsump", "AnyHealthcare", "NoDocbcCost", "DiffWalk"
+)
+#same here
+numeric_vars <- c(
+  "BMI", "MentHlth", "PhysHlth"
+)
+
+#same here
+ordinal_like <- c(
+  "GenHlth", "Age", "Education", "Income"
+)
+
+
+```
+
+## Introduction
+
+In this project, the analysis is around the Diabetes Health Indicators dataset. Each row corresponds to a survey respondent, with the variables capturing self-reported health behaviors/conditions and demogrpahic information such as blood pressure, cholesterol, BMI, smoking, physical activity, self-rated general health, age category, income, etc.).
+
+(Edit this later)
+
+Response:
+
+`Diabetes_binary`: whether the respondent has been told they have diabetes\
+(`0 = No`, `1 = Yes`).
+
+Goals:
+
+1.  Understand how health and key demographic indicators relate to diabetes status.
+
+2.   Build predictive models for the binary diabetes variable.
+
+3.   Select a “best” model and deploy it via an API.
+
+This EDA in this section focuses on understanding marginal distributions and basic relationships within the diabetes outcome data. The modeling details will appear on a separate page denoted later.

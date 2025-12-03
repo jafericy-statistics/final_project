@@ -1,0 +1,23 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Final Project: Diabetes Prediction
+  navbar:
+    left:
+      - text: "eda"
+        href: eda.html
+      - text: "mdeling"
+        href: mdeling.html
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: true
+
+execute:
+  echo: false
+  message: false
+  warning: false
