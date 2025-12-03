@@ -61,8 +61,238 @@ Goals:
 
 1.  Understand how health and key demographic indicators relate to diabetes status.
 
-2.   Build predictive models for the binary diabetes variable.
+2.  Build predictive models for the binary diabetes variable.
 
-3.   Select a “best” model and deploy it via an API.
+3.  Select a “best” model and deploy it via an API.
 
 This EDA in this section focuses on understanding marginal distributions and basic relationships within the diabetes outcome data. The modeling details will appear on a separate page denoted later.
+
+```{r}
+#review data
+glimpse(diab)
+
+#add to tibble
+tibble(
+n_observations = nrow(diab),
+n_variables    = ncol(diab)
+)
+
+#count missing values and reshapes into tidy table. then sorts
+diab |>
+summarize(across(everything(), ~ sum(is.na(.)))) |>
+pivot_longer(everything(), names_to = "variable", values_to = "n_missing") |>
+arrange(desc(n_missing))
+
+
+```
+
+DRAFT:
+
+what vars are missing?
+
+Do I need to drop, impute, or otherwise handle them before modeling?
+
+```{r}
+#count obs in diabetes cat and add prop
+diab |>
+count(Diabetes_binary) |>
+mutate(prop = n / sum(n))
+
+#plot
+diab |>
+ggplot(aes(x = Diabetes_binary)) +
+geom_bar() +
+labs(
+x = "Diabetes Status",
+y = "Count",
+title = "Distribution of Diabetes Status"
+)
+
+```
+
+DRAFT:
+
+is the class balance? i.e. is “No Diabetes” more common?
+
+If there is, how does the imbalance might impact the modeling and data and modeling and evaluation rela to output?
+
+## Binary Risk Factors
+
+Many variables are coded 0/1 but represent yes/no indicators for risk factors. Examples include: high blood pressure, high cholesterol, smoking, and physical activity.
+
+```{r}
+
+#reshape pred columns into long format and converts binary vars
+binary_long <- diab |>
+select(Diabetes_binary, all_of(binary_vars)) |>
+pivot_longer(
+cols = all_of(binary_vars),
+names_to = "variable",
+values_to = "value"
+) |>
+mutate(
+value = factor(value, levels = c(0, 1), labels = c("No", "Yes"))
+)
+
+#plot this as well
+binary_long |>
+count(Diabetes_binary, variable, value) |>
+group_by(Diabetes_binary, variable) |>
+mutate(prop = n / sum(n)) |>
+ungroup() |>
+ggplot(aes(x = value, y = prop, fill = Diabetes_binary)) +
+geom_col(position = "dodge") +
+facet_wrap(~ variable, scales = "free_y") +
+scale_y_continuous(labels = scales::percent_format()) +
+labs(
+x = "Response",
+y = "Proportion within Diabetes Group",
+fill = "Diabetes Status",
+title = "Prevalence of Risk Factors by Diabetes Status"
+) +
+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+NOTES:
+
+Higher prevelance of highBP and highCol (spelling?) in the diabetes group.
+
+Differences in PhysActivuty or walkDiff.
+
+## Continuous Health Measures
+
+We want to treat BMI, MentHlth and PhysHlth as num vars.
+
+We treat `BMI`, `MentHlth`, and `PhysHlth` as numeric variables:
+
+They are defined as follows:
+
+BMI: Body mass index
+
+MentHlth: number of days of poor mental health in the last 30 days
+
+PhysHlth: number of days of poor physical health in the last 30 days
+
+Diabete Status Summary
+
+```{r}
+diab |>
+select(Diabetes_binary, all_of(numeric_vars)) |>
+group_by(Diabetes_binary) |>
+summarize(across(
+.cols = all_of(numeric_vars),
+.fns = list(
+mean   = ~ mean(.x, na.rm = TRUE),
+sd     = ~ sd(.x, na.rm = TRUE),
+q25    = ~ quantile(.x, 0.25, na.rm = TRUE),
+median = ~ median(.x, na.rm = TRUE),
+q75    = ~ quantile(.x, 0.75, na.rm = TRUE)
+),
+.names = "{.col}_{.fn}"
+))
+diab |>
+ggplot(aes(x = BMI, fill = Diabetes_binary)) +
+geom_density(alpha = 0.4) +
+labs(
+x = "BMI",
+y = "Density",
+title = "BMI Distribution by Diabetes Status"
+)
+
+```
+
+Does the diabetes group tend to have higher BMI.
+
+Need to check Overlap between the two groups’ BMI distributions.
+
+### Poor Physical vs Mental Health Days
+
+```{r}
+#cool, this is reproducible
+set.seed(42)
+
+diab |>
+ggplot(aes(x = PhysHlth, y = MentHlth, color = Diabetes_binary)) +
+geom_jitter(alpha = 0.1, size = 0.5) +
+labs(
+x = "Poor Physical Health Days (Last 30)",
+y = "Poor Mental Health Days (Last 30)",
+title = "Physical vs Mental Health Days by Diabetes Status"
+) +
+guides(color = guide_legend(override.aes = list(alpha = 1, size = 3)))
+
+```
+
+Need to see if there are any visible differences or clusters between groups.
+
+## Ordinal-Like Variables (General Health, Age, Education, Income)
+
+Several integer-coded variables are actually ordered categories:
+
+GenHlth: general health (1 = excellent, 5 = poor)
+
+Age: age group code
+
+Education: education level
+
+Income: income category
+
+```{r}
+diab |>
+mutate(GenHlth = as.factor(GenHlth)) |>
+ggplot(aes(x = GenHlth, fill = Diabetes_binary)) +
+geom_bar(position = "fill") +
+scale_y_continuous(labels = scales::percent_format()) +
+labs(
+x = "General Health (1 = Excellent, 5 = Poor)",
+y = "Proportion within Diabetes Group",
+title = "Self-Rated Health vs Diabetes Status"
+)
+
+#age vs income on diabetes status
+diab |>
+mutate(Age = as.factor(Age)) |>
+ggplot(aes(x = Age, fill = Diabetes_binary)) +
+geom_bar(position = "fill") +
+scale_y_continuous(labels = scales::percent_format()) +
+labs(
+x = "Age Group Code",
+y = "Proportion within Diabetes Group",
+title = "Diabetes Status by Age Group"
+) +
+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+diab |>
+mutate(Income = as.factor(Income)) |>
+ggplot(aes(x = Income, fill = Diabetes_binary)) +
+geom_bar(position = "fill") +
+scale_y_continuous(labels = scales::percent_format()) +
+labs(
+x = "Income Category",
+y = "Proportion within Diabetes Group",
+title = "Diabetes Status by Income Category"
+) +
+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+Does diabetes prevalence increase with age group codes?
+
+Are lower income categories associated with higher diabetes prevalence?
+
+## EDA Takeaways
+
+The outcome might be imbalanced, so metrics like log-loss and ROC AUC will be important, not just accuracy so we need to account for that as well.
+
+Strong candidate predictors:
+
+Cardiovascular risk factors (HighBP and HighCol)
+
+Lifestyle: Smoker, PhysActivity, Fruits, Veggies
+
+Health: BMI, GenHlth
+
+Demographics: Age, Income
+
+Nonlinear relationships (e.g., BMI and age categories) suggest that tree-based methods may capture structure that simple linear models might miss, but need to evaluate.
