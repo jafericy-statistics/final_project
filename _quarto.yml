@@ -3,7 +3,7 @@ project:
   output-dir: docs
 
 website:
-  title: "Final Project: Diabetes Prediction
+  title: "Final Project: Diabetes Prediction"
   navbar:
     left:
       - text: "eda"
