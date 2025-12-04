@@ -51,6 +51,8 @@ diab |>
   count(Diabetes_binary)
 ```
 
+We have some information to adjust in the data to properly name the predictor variables and define the outcome. As we have seen often, preparing the data is one of the key concepts to modeling accurately.
+
 ```{r}
 #| label: predictors
 #| message: false
@@ -74,7 +76,7 @@ diab |>
 
 ## Train/Test Split 
 
-IIn this section, we start by splitting the dataset into training and testing sets using stratfied sampling to ensure our proportions of cases are consistent for comparison.
+In this section, we start by splitting the dataset into training and testing sets using stratified sampling to ensure our proportions of cases are consistent for comparison relatvie to count differences between individuals with diabetes and those without.
 
 ```{r}
 #| label: split-recipe
@@ -105,6 +107,8 @@ diab_rec
 
 ## Tuning Option: Option to Speed Up Modeling
 
+If there are issues with modeling, we can try and reduce the dimensionality of the training data before cross-validation.
+
 ```{r}
 #| label: tuning-subset
 #| message: false
@@ -130,6 +134,8 @@ diab_folds_small
 ```
 
 ## Model 1: Classification Tree
+
+Here, we define a classification tree as the first model. While it may not be a strong "best" model later, it is a good first attempt to challenge other models we develop.
 
 ```{r}
 #| label: tree-model
@@ -178,6 +184,8 @@ tree_res |>
   slice(1:5)
 ```
 
+### Best CT Parameters for API
+
 ```{r}
 #| label: tree-final
 #| message: false
@@ -201,6 +209,8 @@ tree_metrics_test
 ```
 
 ## Model 2: Random Forest
+
+We also define a random forest model. This model will probably do better than the classification tree, given the classification tree can have higher variance with small changes, but has better explainability. In this case, we want to fit the best model and use it to test the API.
 
 ```{r}
 #| label: rf-spec
@@ -262,7 +272,7 @@ best_rf_params <- select_best(rf_res, metric = "mn_log_loss")
 best_rf_params
 ```
 
-The following code snippet prints the exact R lines you should paste into `api.R`:
+The following code snippet prints the exact R lines you should paste into the API.R file.
 
 ```{r}
 #| label: rf-best-snippet
