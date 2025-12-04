@@ -1,5 +1,5 @@
 ---
-title: "EDA: Diabetes Health Indicators (BRFSS 2015)"
+title: "EDA: Diabetes Health Indicators"
 author: "Jacob A. Fericy"
 format: html
 ---
@@ -48,22 +48,21 @@ ordinal_like <- c(
 
 ## Introduction
 
-In this project, the analysis is around the Diabetes Health Indicators dataset. Each row corresponds to a survey respondent, with the variables capturing self-reported health behaviors/conditions and demogrpahic information such as blood pressure, cholesterol, BMI, smoking, physical activity, self-rated general health, age category, income, etc.).
+In this project, the analysis is around the Diabetes Health Indicators dataset. Each row corresponds to a survey respondent, with the variables capturing self-reported health behaviors/conditions and demographic information such as blood pressure, cholesterol, BMI, smoking, physical activity, self-rated general health, age category, income, etc.).
 
 Response:
 
-`Diabetes_binary`: whether the respondent has been told they have diabetes\
-(`0 = No`, `1 = Yes`).
+Binary outcome variable for diabetes. Effectively, this measures whether the respondent has been told they have diabetes. (0 = No, 1 = Yes)
 
-Goals:
+Goals of the Project:
 
-1.  Understand how health and key demographic indicators relate to diabetes status.
+1.  Understand how health/demographic indicators relate to diabetes status.
 
 2.  Build predictive models for the binary diabetes variable.
 
 3.  Select a “best” model and deploy it via an API.
 
-This EDA in this section focuses on understanding marginal distributions and basic relationships within the diabetes outcome data. The modeling details will appear on a separate page denoted later.
+This EDA in this section focuses on understanding marginal distributions and basic relationships within the diabetes outcome data. The modeling details will appear on a separate page, as noted later.
 
 ```{r}
 #review data
@@ -84,11 +83,9 @@ arrange(desc(n_missing))
 
 ```
 
-QUESITONS TO ANSWER:
+We review which variables are missing so we can understand which variables are safe for modeling, or could use imputation, if there are missing values at all.
 
-what vars are missing?
-
-Do I need to drop, impute, or otherwise handle them before modeling?
+In addition, before we model a binary outcome, it is important to ascertain if the classes are balanced. Here, we compute counts and proportions of the diabetes variable to understand the distribution.
 
 ```{r}
 #count obs in diabetes cat and add prop
@@ -108,11 +105,7 @@ title = "Distribution of Diabetes Status"
 
 ```
 
-QUESITONS TO ANSWER:
-
-is the class balance? i.e. is “No Diabetes” more common?
-
-If there is, how does the imbalance might impact the modeling and data and modeling and evaluation rela to output?
+We see that the outcome of individuals with no diabetes is more prevelant than diabetes. As such, we need to adjust our sampling and potentially our performance metrics accordingly.
 
 ## Binary Risk Factors
 
@@ -151,17 +144,11 @@ title = "Prevalence of Risk Factors by Diabetes Status"
 theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-NOTES:
-
-Higher prevelance of highBP and highCol (spelling?) in the diabetes group.
-
-Differences in PhysActivuty or walkDiff.
+These notes demonstrate that each risk factor differs between those with diabetes and those without.
 
 ## Continuous Health Measures
 
-We want to treat BMI, MentHlth and PhysHlth as num vars.
-
-We treat `BMI`, `MentHlth`, and `PhysHlth` as numeric variables:
+We want to treat BMI, MentHlth and PhysHlth as numerical varables. We also treat `BMI`, `MentHlth`, and `PhysHlth` as numeric variables.
 
 They are defined as follows:
 
@@ -170,8 +157,6 @@ BMI: Body mass index
 MentHlth: number of days of poor mental health in the last 30 days
 
 PhysHlth: number of days of poor physical health in the last 30 days
-
-Diabete Status Summary
 
 ```{r}
 diab |>
@@ -199,11 +184,11 @@ title = "BMI Distribution by Diabetes Status"
 
 ```
 
-Does the diabetes group tend to have higher BMI.
-
-Need to check Overlap between the two groups’ BMI distributions.
+These patterns suggest there may been nonlinear effects on BMI as a predictor for example.
 
 ### Poor Physical vs Mental Health Days
+
+As an example, we could explore the joint distribution of poor physical and poor mental health days.
 
 ```{r}
 #cool, this is reproducible
@@ -221,7 +206,7 @@ guides(color = guide_legend(override.aes = list(alpha = 1, size = 3)))
 
 ```
 
-Need to see if there are any visible differences or clusters between groups.
+The above graph shows the health burden of physical and mental health and how it relates to diabetes.
 
 ## Ordinal-Like Variables (General Health, Age, Education, Income)
 
@@ -275,13 +260,9 @@ theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
-Does diabetes prevalence increase with age group codes?
+## EDA Final Takeaways
 
-Are lower income categories associated with higher diabetes prevalence?
-
-## EDA Takeaways
-
-The outcome might be imbalanced, so metrics like log-loss and ROC AUC will be important, not just accuracy so we need to account for that as well.
+The outcome might be imbalanced, so metrics like log-loss and ROC AUC will be important, not just accuracy, so we need to account for that as well, given the distribution of the data.
 
 Strong candidate predictors:
 
