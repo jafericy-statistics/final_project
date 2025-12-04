@@ -1,0 +1,329 @@
+---
+title: "Modeling: Diabetes Prediction and Model Selection (API)"
+author: "Jacob A. Fericy"
+format: html
+editor: visual
+---
+
+## Setup
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+#| cache: true
+
+library(tidyverse)
+library(tidymodels)
+tidymodels_prefer()
+theme_set(theme_minimal())
+```
+
+## Introduction
+
+In this project, the analysis is around the Diabetes Health Indicators dataset. Each row corresponds to a survey respondent, with the variables capturing self-reported health behaviors/conditions and demogrpahic information such as blood pressure, cholesterol, BMI, smoking, physical activity, self-rated general health, age category, income, etc.). In this page, we are fitting the best model relative to the dataset and using the settings we find to incorporate into our API endpoint so we can test our binary predictor variable in real time, relative to various inputs.
+
+## Data: Load and Prepare
+
+```{r}
+#| label: data-load
+#| message: false
+#| warning: false
+#| cache: true
+
+#read in data
+diab_raw <- read_csv(
+  "diabetes_binary_health_indicators_BRFSS2015.csv",
+  show_col_types = FALSE
+)
+
+#reclassiify binary predictor
+diab <- diab_raw |>
+  mutate(
+    Diabetes_binary = factor(
+      Diabetes_binary,
+      levels = c(0, 1),
+      labels = c("No", "Diabetes")
+    )
+  )
+
+diab |>
+  count(Diabetes_binary)
+```
+
+```{r}
+#| label: predictors
+#| message: false
+#| warning: false
+#| cache: true
+
+#predefine predictors
+predictors <- c(
+  "HighBP", "HighChol", "BMI", "Smoker",
+  "PhysActivity", "GenHlth", "Age", "Income"
+)
+
+#define outcome
+outcome <- "Diabetes_binary"
+
+#preview structure of outcome and pred vars
+diab |>
+  select(all_of(c(outcome, predictors))) |>
+  glimpse()
+```
+
+## Train/Test Split 
+
+IIn this section, we start by splitting the dataset into training and testing sets using stratfied sampling to ensure our proportions of cases are consistent for comparison.
+
+```{r}
+#| label: split-recipe
+#| message: false
+#| warning: false
+#| cache: true
+
+set.seed(321)
+diab_split <- initial_split(diab, strata = Diabetes_binary)
+diab_train <- training(diab_split)
+diab_test  <- testing(diab_split)
+
+set.seed(321)
+#cv fold
+diab_folds <- vfold_cv(diab_train, v = 5, strata = Diabetes_binary)
+
+#preprocessing removes zero variance preds and normalizes
+diab_rec <- recipe(
+  Diabetes_binary ~ HighBP + HighChol + BMI + Smoker +
+    PhysActivity + GenHlth + Age + Income,
+  data = diab_train
+) |>
+  step_zv(all_predictors()) |>
+  step_normalize(all_numeric_predictors())
+
+diab_rec
+```
+
+## Tuning Option: Option to Speed Up Modeling
+
+```{r}
+#| label: tuning-subset
+#| message: false
+#| warning: false
+#| cache: true
+
+#30% strat sample
+set.seed(321)
+diab_train_small <- diab_train |>
+  group_by(Diabetes_binary) |>
+  sample_frac(0.30) |>
+  ungroup()
+
+#cv fold
+set.seed(321)
+diab_folds_small <- vfold_cv(
+  diab_train_small,
+  v = 5,
+  strata = Diabetes_binary
+)
+
+diab_folds_small
+```
+
+## Model 1: Classification Tree
+
+```{r}
+#| label: tree-model
+#| message: false
+#| warning: false
+#| cache: true
+
+#create the classification tree with tuning
+tree_spec <- decision_tree(
+  mode = "classification",
+  cost_complexity = tune(),
+  tree_depth      = tune(),
+  min_n           = tune()
+) |>
+  set_engine("rpart")
+
+#workflow for adding dec tree model spec with other recipe
+tree_wf <- workflow() |>
+  add_model(tree_spec) |>
+  add_recipe(diab_rec)
+
+#grid for tuning complexity
+tree_grid <- grid_regular(
+  cost_complexity(range = c(-4, -1)),
+  tree_depth(range = c(3L, 10L)),
+  min_n(range = c(5L, 40L)),
+  levels = c(3, 3, 3)
+)
+
+tree_metrics <- metric_set(accuracy, roc_auc, mn_log_loss)
+
+#tune tree workflow over grid for cross val
+set.seed(321)
+tree_res <- tune_grid(
+  tree_wf,
+  resamples = diab_folds_small,
+  grid      = tree_grid,
+  metrics   = tree_metrics,
+  control   = control_grid(save_pred = FALSE)
+)
+#get model metrics filters for the log-oss and displays top n=5 results
+tree_res |>
+  collect_metrics() |>
+  filter(.metric == "mn_log_loss") |>
+  arrange(mean) |>
+  slice(1:5)
+```
+
+```{r}
+#| label: tree-final
+#| message: false
+#| warning: false
+#| cache: true
+
+#get best tree
+best_tree_params <- select_best(tree_res, metric = "mn_log_loss")
+best_tree_params
+
+final_tree_wf <- finalize_workflow(tree_wf, best_tree_params)
+
+set.seed(321)
+tree_last <- last_fit(final_tree_wf, diab_split)
+
+tree_metrics_test <- tree_last |>
+  collect_metrics()
+
+#output metrics
+tree_metrics_test
+```
+
+## Model 2: Random Forest
+
+```{r}
+#| label: rf-spec
+#| message: false
+#| warning: false
+#| cache: true
+
+#creates a tunable random forest classification model
+rf_spec <- rand_forest(
+  mode  = "classification",
+  mtry  = tune(),
+  min_n = tune(),
+  trees = 300
+) |>
+  set_engine("ranger", importance = "impurity")
+
+#creates wf and pairs rf model with recipe
+rf_wf <- workflow() |>
+  add_model(rf_spec) |>
+  add_recipe(diab_rec)
+
+#tuning grid
+rf_grid <- grid_regular(
+  mtry(range = c(3L, min(10L, length(predictors)))),
+  min_n(range = c(5L, 40L)),
+  levels = c(3, 3)
+)
+#get metrics
+rf_metrics <- metric_set(accuracy, roc_auc, mn_log_loss)
+
+set.seed(321)
+
+#this tunes the rf for cv
+rf_res <- tune_grid(
+  rf_wf,
+  resamples = diab_folds_small,
+  grid      = rf_grid,
+  metrics   = rf_metrics,
+  control   = control_grid(save_pred = FALSE)
+)
+#gets log oss results from tuning
+rf_res |>
+  collect_metrics() |>
+  filter(.metric == "mn_log_loss") |>
+  arrange(mean) |>
+  slice(1:10)
+```
+
+### Best RF Parameters for API
+
+```{r}
+#| label: rf-best-params
+#| message: false
+#| warning: false
+#| cache: true
+
+#gets the optimal metrics for rf for downstream tuning
+best_rf_params <- select_best(rf_res, metric = "mn_log_loss")
+best_rf_params
+```
+
+The following code snippet prints the exact R lines you should paste into `api.R`:
+
+```{r}
+#| label: rf-best-snippet
+#| message: false
+#| warning: false
+#| cache: false
+
+#prints the best tuning for the rf model for easy output on qmd page for tuning. 
+cat(
+  sprintf(
+    "best_mtry  <- %d\n best_min_n <- %d\n",
+    best_rf_params$mtry,
+    best_rf_params$min_n
+  )
+)
+```
+
+## Final Model Evaluation on Test Set
+
+```{r}
+#| label: rf-final-fit
+#| message: false
+#| warning: false
+#| cache: true
+
+#final workflow
+final_rf_wf <- finalize_workflow(rf_wf, best_rf_params)
+
+set.seed(321)
+#eval final wf on test set
+rf_last <- last_fit(final_rf_wf, diab_split)
+
+#get metrics
+rf_metrics_test <- rf_last |>
+  collect_metrics()
+
+#output metrics
+rf_metrics_test
+
+#pred metrics
+rf_preds_test <- rf_last |>
+  collect_predictions()
+
+#generate confusion matrix
+rf_conf <- conf_mat(
+  rf_preds_test,
+  truth   = Diabetes_binary,
+  estimate = .pred_class
+)
+
+rf_conf
+```
+
+```{r}
+#| label: rf-conf-plot
+#| message: false
+#| warning: false
+#| cache: true
+
+#plot the random forest (best model) confusion matrix as a heatmap
+autoplot(rf_conf, type = "heatmap")
+```
+
+We tune this random forest with tuned mtry and min_n which we have printed above. We then refit the api.R file with this tuning and utilize this for our API endpoint engine.

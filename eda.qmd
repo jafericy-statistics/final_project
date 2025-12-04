@@ -50,8 +50,6 @@ ordinal_like <- c(
 
 In this project, the analysis is around the Diabetes Health Indicators dataset. Each row corresponds to a survey respondent, with the variables capturing self-reported health behaviors/conditions and demogrpahic information such as blood pressure, cholesterol, BMI, smoking, physical activity, self-rated general health, age category, income, etc.).
 
-(Edit this later)
-
 Response:
 
 `Diabetes_binary`: whether the respondent has been told they have diabetes\
@@ -86,7 +84,7 @@ arrange(desc(n_missing))
 
 ```
 
-DRAFT:
+QUESITONS TO ANSWER:
 
 what vars are missing?
 
@@ -110,7 +108,7 @@ title = "Distribution of Diabetes Status"
 
 ```
 
-DRAFT:
+QUESITONS TO ANSWER:
 
 is the class balance? i.e. is “No Diabetes” more common?
 
