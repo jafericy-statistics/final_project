@@ -160,5 +160,7 @@ function() {
     estimate = pred_class
   )
   
-  autoplot(cm, type = "heatmap")
+  p <- autoplot(cm, type = "heatmap")
+  
+  print(p)
 }
